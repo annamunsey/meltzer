@@ -1,5 +1,6 @@
 list.of.packages <- c("lubridate","zoo","binom","devtools",
-                      "foreign", "tidyverse", "readxl", "ggpubr","here")
+                      "foreign", "tidyverse", "readxl", "ggpubr", "scales",
+                      "viridis", "plotly", "here")
 
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)

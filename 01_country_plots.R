@@ -1,3 +1,5 @@
+#NOTE population denominators account for proportion of population at risk
+
 source("00_setup.R")
 
 annex_4f <- read_xlsx("data/wmr2024_annex_4f_WHOAFRO.xlsx") 
@@ -5,26 +7,35 @@ annex_4f <- read_xlsx("data/wmr2024_annex_4f_WHOAFRO.xlsx")
 unique(annex_4f$country)
 
 #add 2024 GDP per capita per wikipedia
-countries <- data.frame(unique(annex_4f$country)) %>% rename(country =1) %>% 
+gdp <- data.frame(unique(annex_4f$country)) %>% rename(country =1) %>% 
   mutate(gdp_2024 = c(5579,2961,1510,7341,908,321,5388,1821,530,1013,1630,2384,
                       2720,702,8102,567,4375,1350,9257,989,2232,1652,1106,2218,
                       855,563,464,898,2376,645,4410,698,877,986,3425,1805,856,
-                      6377,341,1051,1187,1224,1226,2114)) %>% 
+                      6377,341,1051,1187,1224,1226,2114))
+
+table <- gdp %>% 
+  filter(!is.na(gdp_2024))
+
+  #add funding categories:
+  mutate(funding_category = case_when(funding_2021_2023 <= 3 ~ "low",
+                                      funding_2021_2023 >3 ~ "high")) %>% 
+  dplyr::select(-c(funding_2021_2023))
+
   #exclude north africa:
-    filter(country != "Algeria") %>% 
+ #   filter(country != "Algeria") %>% 
 
   #exclude islands: 
-  filter(country != "Cabo Verde") %>% 
-  filter(country != "Sao Tome and Principe") %>% 
-  filter(country != "Comoros") %>% 
-  filter(country != "Madagascar") %>% 
-  mutate(gdp_tertile = ntile(gdp_2024, 3)) %>% 
+#  filter(country != "Cabo Verde") %>% 
+#  filter(country != "Sao Tome and Principe") %>% 
+#  filter(country != "Comoros") %>% 
+#  filter(country != "Madagascar") %>% 
+#  mutate(gdp_tertile = ntile(gdp_2024, 3)) %>% 
   
   #exclude low transmission countries:
-  filter(country != "South Africa") %>% 
-  filter(country != "Botswana") %>% 
-  filter(country != "Namibia") %>% 
-  filter(country != "Eswatini")
+#  filter(country != "South Africa") %>% 
+#  filter(country != "Botswana") %>% 
+#  filter(country != "Namibia") %>% 
+#  filter(country != "Eswatini")
 
 #write.csv(countries, "countries_partial.csv")
 
