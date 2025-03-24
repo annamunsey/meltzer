@@ -6,26 +6,44 @@ source("00_setup.R")
 
 data <- read_xlsx("data/wmr2024_annex_4f.xlsx") %>% 
   #filter(country == "African") %>% 
-  mutate(cases_lower = as.numeric(cases_lower),
+  mutate(cases_millions = cases/1000000,
+         cases_lower = as.numeric(cases_lower),
          cases_upper = as.numeric(cases_upper),
          deaths_lower = as.numeric(deaths_lower),
          deaths_upper = as.numeric(deaths_upper),
+         #calculate cases per 1,000 persons at risk
          cases_lower_rate = 1000*(cases_lower/population)
          ,cases_rate = 1000*(cases/population)
          ,cases_upper_rate = 1000*(cases_upper/population)
+         #calculate deaths per 100,000 persons at risk
          ,deaths_lower_rate = 100000*(deaths_lower/population)
          ,deaths_rate = 100000*(deaths/population)
          ,deaths_upper_rate = 100000*(deaths_upper/population))
 
 
 data_combined <- data %>% 
-  filter(country == "African") 
+  filter(country == "African") %>% 
+#add column for deaths at baseline to serve as boundary for plot below %>% 
+  mutate(deaths_baseline = c(804683),
+         deaths_averted = deaths_baseline - deaths)
+pop_atrisk <- data_combined %>% 
+  dplyr::select(c(year,population)) %>% 
+  mutate(date = as.Date(with(ITN_BV, paste(year, "01", "01", sep="-")), "%Y-%m-%d"))
+
+#subset to >2001 so as to not highlight the increase in deaths in 2001 w plot shading
+interim <- data.frame(country = "African", year = 2001.5, 
+                      deaths_baseline = 804684, deaths = 804683)  #if this looks weird then try values at 2001 and 2002/2
+data_shading <- data_combined %>% 
+  filter(year >2001) %>% as.data.frame()
+data_shading <- rbind.fill(data_shading, interim)
+
 plot_1 <- ggplot(data_combined, aes(year, deaths)) +
   geom_line(size = 0.5, color = "darkblue", fill = "darkblue") +
   geom_ribbon(aes(ymin = deaths_lower, ymax = deaths_upper), alpha = 0.2, fill = "darkblue") +
   theme_bw() + 
   scale_y_continuous(labels = label_comma(),
-                     limits = c(500000,860000)) +
+                     limits = c(0,860000)) +
+ 
   #geom_segment(x = 2000, xend = 2023, y = 804683, yend = 804683, linetype = "dashed") +
   ylab("total malaria deaths per year, WHO African Region\n") +
   xlab("\nyear") +
@@ -34,21 +52,262 @@ plot_1 <- ggplot(data_combined, aes(year, deaths)) +
         axis.title.y = element_text(size = 16)); plot_1
 
 plot_2 <- ggplot(data_combined, aes(year, deaths)) +
-  geom_line(size = 0.5, color = "darkblue") +
-  theme_bw() +
-  
-  theme(legend.title=element_blank(),
-        #axis.title.y = element_blank()
-  ) + 
   scale_y_continuous(labels = label_comma(),
-                     limits = c(500000,860000)) +
-  geom_segment(x = 2000, xend = 2023, y = 804683, yend = 804683, linetype = "dashed") +
-  ylab("total malaria deaths per year, WHO African Region\n") +
+                     limits = c(500000, 860000)) +
+  scale_x_continuous(limits = c(2000,2025.5)) +
+ 
+  ylab("Total malaria deaths per year,\n WHO African Region\n") +
   xlab("\nyear") +
-  theme(axis.text = element_text(size = 14),
-        axis.title.x = element_text(size = 16),
-        axis.title.y = element_text(size = 16)); plot_2
+  geom_ribbon_pattern(data = data_shading, 
+                      aes(ymin = deaths, ymax = deaths_baseline),
+   #pattern = level, pattern_angle = level, pattern_spacing = level), 
+   fill = 'white', colour = 'lightgrey', 
+   pattern_spacing = 0.02,
+   pattern_density = 0.1, 
+   pattern_angle = 60,
+   pattern_fill    = 'lightblue', alpha = 0.5,
+   linetype = 0) +
+  geom_line(size = 1, color = "darkblue") +
+  geom_segment(x = 2000, xend = 2023, y = 804683, yend = 804683, 
+               linetype = "dashed", size = 1) +
+  geom_segment(x = 2023.5, xend = 2023.5, y = 568749, yend = 804683, 
+               linetype = "solid", size = 0.75) +
+  annotate(
+    geom = "text",
+    x = 2023.8,
+    y = 700000,
+    label = "3.9 million \ncumulative \ndeaths averted",
+    lineheight = 1,
+    label.size = 0,
+    hjust = 0,
+    size = 4
+  ) +
+  theme_bw() +
+  theme(legend.title=element_blank(),
+        axis.text = element_text(size = 16),
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20)); plot_2
 
+#sum(data_combined$deaths_averted)
+
+ggsave("plots/WHO African region deaths per year shading.jpg", plot_2, height = 5, width = 14)
+
+
+### same plot as above without shading, baseline deaths line, and deaths averted text
+
+plot_2.1 <- ggplot(data_combined, aes(year, deaths)) +
+  scale_y_continuous(labels = label_comma(),
+                     limits = c(500000, 860000)) +
+  scale_x_continuous(limits = c(2000,2023)) +
+  
+  ylab("Total malaria deaths per year,\n WHO African Region\n") +
+  xlab("\nyear") +
+  geom_line(size = 1, color = "darkblue") +
+  theme_bw() +
+  theme(legend.title=element_blank(),
+        axis.text = element_text(size = 16),
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20)); plot_2.1
+
+#sum(data_combined$deaths_averted)
+
+ggsave("plots/WHO African region deaths per year minimal.jpg", plot_2.1, height = 7, width = 14)
+
+
+### plot of cases 
+
+plot_3 <- ggplot(data_combined, aes(year, cases_millions)) +
+  scale_y_continuous(labels = label_comma(),
+                     limits = c(200,250)) +
+  scale_x_continuous(limits = c(2000,2023)) +
+  
+  ylab("Total malaria cases (millions)\n per year,\n WHO African Region\n") +
+  xlab("\nyear") +
+  geom_line(size = 1, color = "darkblue") +
+  theme_bw() +
+  theme(legend.title=element_blank(),
+        axis.text = element_text(size = 16),
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20)); plot_3
+
+#sum(data_combined$deaths_averted)
+
+ggsave("plots/WHO African region cases per year.jpg", plot_3, height = 7, width = 14)
+
+
+### plot of incidence - cases per population at risk
+
+plot_4 <- ggplot(data_combined, aes(year, cases_rate)) +
+  scale_y_continuous(labels = label_comma(),
+                     limits = c(200, 400)) +
+  scale_x_continuous(limits = c(2000,2023)) +
+  
+  ylab("Total malaria cases per year\n per 1,000 persons at risk,\n WHO African Region\n") +
+  xlab("\nyear") +
+  geom_line(size = 1, color = "darkblue") +
+  theme_bw() +
+  theme(legend.title=element_blank(),
+        axis.text = element_text(size = 16),
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_text(size = 20)); plot_4
+
+#sum(data_combined$deaths_averted)          figure does not account for population growth
+
+ggsave("plots/WHO African region cases per 1000 persons at risk per year.jpg", plot_4, height = 7, width = 14)
+
+
+
+### plot ITN use over time - data taken from
+# https://www.nature.com/articles/s41467-021-23707-7/figures/2
+# https://github.com/bertozzivill/map-itn-cube/blob/publication-2021/paper_figures/figure_data/fig_2_access_use_timeseries.csv
+
+#get ITN coverage data from paper
+ITN_BV <- read.csv("data/fig_2_access_use_timeseries.csv") %>% 
+  #data is at country-level; filtering to SSA aggregate data:
+  filter(iso3 == "AFR",
+         variable == "use",
+         year <2010
+         ) %>% 
+  group_by(year) %>% 
+  dplyr::summarise(use = mean(mean_among_atrisk)) %>% 
+  mutate(date = as.Date(with(ITN_BV, paste(year, "01", "01", sep="-")), "%Y-%m-%d"),
+         source = "Bertozzi-Villa") %>% dplyr::select(-c(year))
+
+#get proportion at risk from paper - don't really need this as WHO pop denominator is at-risk population
+prop_atrisk <- read.csv("data/fig_2_access_use_timeseries.csv") %>% 
+  filter(iso3 == "AFR",
+         variable == "use") %>% 
+  group_by(year) %>% 
+  dplyr::summarise(prop_atrisk = mean(prop_atrisk)) %>% 
+  mutate(date = as.Date(with(ITN_BV, paste(year, "01", "01", sep="-")), "%Y-%m-%d"),
+         source = "Bertozzi-Villa") %>% dplyr::select(-c(year))
+
+
+#get 2010 - 2022 data from MAP - 
+ITN_MAP <- read.csv("data/MAP ITN metrics 2010-2022.csv") %>% 
+  filter(Metric == "Use") %>% 
+  group_by(Year) %>% 
+  dplyr::summarise(use = mean(Value)/100) %>% 
+  mutate(date = lubridate::ymd(Year, truncated = 2),
+         #iso3 = "AFR", 
+         source = "MAP") %>% dplyr::select(-c(Year))
+
+ITN <- rbind(ITN_BV, ITN_MAP) %>% 
+ left_join(pop_atrisk, by = "date") %>% 
+  mutate(pop_cov = population*use)
+
+#updates to above data frame prior to merging w/ITN data
+data_combined <- data_combined %>% mutate(date = lubridate::ymd(year, truncated = 2),
+                                          iso3 = "AFR") %>% 
+  left_join(ITN)
+
+ITN <- data_combined %>% dplyr::select(c(year, deaths, use, pop_cov))
+
+data_long <- ITN %>% 
+  pivot_longer(-c(year)) %>% 
+  mutate(label = str_replace_all(name, c("deaths" = "Total malaria deaths per year,\n WHO African Region",
+                          "use" = "ITN coverage per person at risk,\n WHO African Region",
+                          "pop_cov" = "Population protected by ITN,\n WHO African Region"))) %>% 
+  #reorder so plot of deaths is on top:
+  mutate(label = fct_relevel(label, "Total malaria deaths per year,\n WHO African Region",
+                             "ITN coverage per person at risk,\n WHO African Region",
+                             "Population protected by ITN,\n WHO African Region"))
+
+plot_data <-data_long %>% 
+  filter(label != "ITN coverage per person at risk,\n WHO African Region")
+
+plot_5 <- ggplot(plot_data, aes(year, value)) +
+  xlab("\nyear") +
+  geom_line(size = 1, color = "darkblue") +
+  facet_grid(rows = vars(label), scales = "free") + 
+  
+  theme_bw() +   
+  facetted_pos_scales(y = list(
+    label == "Total malaria deaths per year,\n WHO African Region" ~ 
+      scale_y_continuous(breaks = c(600000, 700000, 800000), labels = label_comma()),
+    label ==  "Population protected by ITN,\n WHO African Region" ~ 
+      scale_y_continuous(breaks = c(0,200000000,400000000), labels = label_comma()))) +
+    theme(legend.title = element_blank(),
+        axis.text = element_text(size = 16),
+        axis.title.x = element_text(size = 20),
+        axis.title.y = element_blank(),
+        strip.text.y = element_text(size = 12)); plot_5
+
+ggsave("plots/WHO African region deaths ITN coverage population.jpg", plot_5, height = 6, width = 9)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#coeff <-  0.000000575
+#data_combined$ITNuse_transformed <- data_combined$use/coeff
+#plot_5 <- ggplot(data_combined, aes(year)) +
+#  geom_line(aes(y = deaths)
+#            #,data = ~transform(., deaths = scales::rescale(mean_among_atrisk, range(deaths)))
+#            ,color = "darkblue", size = 1) +
+#  geom_line(aes(y = ITNuse_transformed), size = 1, color = "#D41159") +
+#  scale_y_continuous(labels = label_comma(),
+#                     #limits = c(300000, 850000),
+#                     sec.axis = sec_axis(~scales::rescale(.,range(data_combined$mean_among_atrisk),
+#                                                          range(data_combined$deaths)))) +
+#  scale_x_continuous(limits = c(2000,2023)) +
+  
+#  ylab("Total malaria deaths per year,\n WHO African Region\n") +
+#  xlab("\nyear") +
+#   theme_bw() +
+#  theme(legend.title=element_blank(),
+#        axis.text = element_text(size = 16),
+#        axis.title.x = element_text(size = 20),
+#        axis.title.y = element_text(size = 20)); plot_5
+
+
+#coeff <- 0.0000015625
+#data_combined$ITNuse_transformed <- data_combined$mean_among_atrisk/coeff
+#plot_5 <- ggplot(data_combined, aes(year)) +
+#  geom_line(aes(y = deaths)
+#            #,data = ~transform(., deaths = scales::rescale(mean_among_atrisk, range(deaths)))
+#            ,color = "darkblue", size = 1) +
+#  geom_line(aes(y = ITNuse_transformed), size = 1, color = "#D41159") +
+#  scale_y_continuous(
+#                     #limits = c(300000, 850000),
+#                     sec.axis = ~(.-500000)/coeff
+#                     ,labels = label_comma()) +
+#  scale_x_continuous(limits = c(2000,2023)) +
+#  
+#  ylab("Total malaria deaths per year,\n WHO African Region\n") +
+#  xlab("\nyear") +
+#  
+#  theme_bw() +
+#  theme(legend.title=element_blank(),
+#        axis.text = element_text(size = 16),
+#        axis.title.x = element_text(size = 20),
+#        axis.title.y = element_text(size = 20)); plot_5
+
+
+#sum(data_combined$deaths_averted)
+
+
+
+
+
+
+
+
+
+
+
+#############################################################################
+#############################################################################
+############################    ARCHIVE    ##################################
 
 ###ADD MB FUNDING DATA - 
 budget <- read_xlsx("data/MB Funding History.xlsx") %>% 
